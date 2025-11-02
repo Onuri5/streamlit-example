@@ -4,3 +4,4 @@ streamlit
 plotly
 matplotlib
 openpyx1
+seaborn
