@@ -8,7 +8,7 @@ import seaborn as sns
 st.title('Product Sales and Profit Analysis')
 
 # File path (assuming the file is accessible by the Streamlit app)
-file_path = "Orders Final Limpio.xlsx"
+file_path = "/content/drive/MyDrive/Herramientas Datos/Orders Final Limpio.xlsx"
 
 # Read the data
 @st.cache_data
@@ -31,7 +31,7 @@ top_5_products = product_sales.nlargest(5, 'Sales')
 # Create a bar chart for top 5 best-selling products using Plotly Express
 st.subheader('Top 5 Best-Selling Products')
 fig_sales = px.bar(top_5_products, x='Sales', y='Product Name', title='Top 5 Best-Selling Products')
-fig_sales.update_layout(yaxis={'categoryorder':'total ascending'})
+fig_sales.update_layout(yaxis={'categoryorder':'total ascending', 'tickangle': -45, 'tickfont': dict(size=10)}, margin=dict(l=150, r=20, t=40, b=30)) # Added layout updates
 st.plotly_chart(fig_sales)
 
 # Calculate total profit per product
@@ -43,7 +43,7 @@ top_5_profit_products = product_profit.nlargest(5, 'Profit')
 # Create a bar chart for top 5 products by profit using Plotly Express
 st.subheader('Top 5 Products by Profit')
 fig_profit = px.bar(top_5_profit_products, x='Profit', y='Product Name', title='Top 5 Products by Profit')
-fig_profit.update_layout(yaxis={'categoryorder':'total ascending'})
+fig_profit.update_layout(yaxis={'categoryorder':'total ascending', 'tickangle': -45, 'tickfont': dict(size=10)}, margin=dict(l=150, r=20, t=40, b=30)) # Added layout updates
 st.plotly_chart(fig_profit)
 
 # Display sales and profit details for the top 5 products
