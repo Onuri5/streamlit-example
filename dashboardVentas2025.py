@@ -8,7 +8,7 @@ import seaborn as sns
 st.title('Product Sales and Profit Analysis')
 
 # File path (assuming the file is accessible by the Streamlit app)
-file_path = "/content/drive/MyDrive/Herramientas Datos/Orders Final Limpio.xlsx"
+file_path = "Orders Final Limpio.xlsx"
 
 # Read the data
 @st.cache_data
