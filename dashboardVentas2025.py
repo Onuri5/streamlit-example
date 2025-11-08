@@ -25,7 +25,7 @@ df = load_data(file_path)
 
 # Display data types
 st.subheader('Data Types')
-st.write(df.dtypes)
+st.write(df.info())
 
 # Add a region filter
 st.sidebar.subheader("Filtro por Región y Estado")
