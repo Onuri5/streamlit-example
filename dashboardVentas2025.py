@@ -13,17 +13,19 @@ file_path = "Orders Final Limpio.xlsx"
 # Read the data
 @st.cache_data
 def load_data(path):
-    data = pd.read_excel(path)
-    df = df.drop('Ship date', axis=1)
-    df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
-    df['Ship Date'] = pd.to_datetime(df['Ship Date'], errors='coerce')
-    return data
+    df = pd.read_excel(path)
+    if 'Ship date' in df.columns:
+        df = df.drop('Ship date', axis=1)
+    for col in ['Order Date', 'Ship Date']:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+    return df
 
 df = load_data(file_path)
 
 # Display data types
 st.subheader('Data Types')
-st.write(df.info())
+st.write(df.dtypes)
 
 # Add a region filter
 st.sidebar.subheader("Filtro por Región y Estado")
