@@ -7,36 +7,43 @@ import seaborn as sns
 st.set_page_config(page_title="Product Sales and Profit Analysis", layout="wide")
 st.title("Product Sales and Profit Analysis")
 
+# Cambia aquí si tu archivo se llama distinto
 FILE_PATH = "Orders Final Limpio.xlsx"
+
+# ---------------- Utilidad: asegurar 'date' para tablas ----------------
+def _ensure_date_for_table(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    df = df.copy()
+    for c in cols:
+        if c in df.columns:
+            s = pd.to_datetime(df[c], errors="coerce")
+            df[c] = s.dt.date  # <- convertir a 'date' para DateColumn
+    return df
 
 # ---------------- Carga, limpieza y normalización ----------------
 @st.cache_data
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_excel(path)
 
-    # Normaliza encabezados
+    # Normaliza encabezados (espacios)
     df.columns = df.columns.str.strip()
 
     # --- Consolidar y eliminar 'Ship date' (d minúscula) preservando datos en 'Ship Date' ---
     if "Ship date" in df.columns:
         if "Ship Date" not in df.columns:
-            # si solo existe la minúscula, renómbrala a la estándar
             df = df.rename(columns={"Ship date": "Ship Date"})
         else:
-            # si existen ambas, completa 'Ship Date' con los valores válidos de 'Ship date'
+            # completar 'Ship Date' con lo que tenga 'Ship date'
             tmp = pd.to_datetime(df["Ship date"], errors="coerce")
             df["Ship Date"] = pd.to_datetime(df["Ship Date"], errors="coerce")
             fill_mask = df["Ship Date"].isna() & tmp.notna()
             if fill_mask.any():
                 df.loc[fill_mask, "Ship Date"] = tmp.loc[fill_mask]
-            # elimina la columna con d minúscula
             df = df.drop(columns=["Ship date"])
 
     # Convierte fechas (acepta serial de Excel o texto)
     for col in ["Order Date", "Ship Date"]:
         if col in df.columns:
             if pd.api.types.is_numeric_dtype(df[col]):
-                # serial de Excel -> fecha
                 df[col] = pd.to_datetime(df[col], unit="d", origin="1899-12-30", errors="coerce")
             else:
                 df[col] = pd.to_datetime(df[col], errors="coerce")
@@ -62,7 +69,7 @@ selected_state = st.sidebar.selectbox("Selecciona un Estado", state_list)
 
 filtered_df = df_region if selected_state == "Todos" else df_region[df_region["State"] == selected_state].copy()
 
-# ---------------- Data Types (sin df.info() -> None) ----------------
+# ---------------- Data Types (sin df.info -> None) ----------------
 st.subheader("Data Types")
 st.dataframe(
     pd.DataFrame({"Column": df.columns, "Dtype": df.dtypes.astype(str)}),
@@ -70,14 +77,11 @@ st.dataframe(
 )
 
 # ---------------- Mostrar datos filtrados ----------------
-if st.sidebar.checkbox("Mostrar datos filtrados"):
+if st.sidebar.checkbox("Mostrar datos filtrados", value=True):
     st.subheader("Datos Filtrados")
     df_show = filtered_df.copy()
-
-    # Garantiza dtype datetime (evita 'None' por cadenas)
-    for col in ["Order Date", "Ship Date"]:
-        if col in df_show.columns and not pd.api.types.is_datetime64_any_dtype(df_show[col]):
-            df_show[col] = pd.to_datetime(df_show[col], errors="coerce")
+    date_cols = [c for c in ["Order Date", "Ship Date"] if c in df_show.columns]
+    df_show = _ensure_date_for_table(df_show, date_cols)
 
     st.dataframe(
         df_show,
@@ -147,14 +151,11 @@ cols_to_show = ["Product Name"] + date_cols + base_cols[1:]
 
 details = filtered_df[filtered_df["Product Name"].isin(product_sales["Product Name"])]
 details_show = details[cols_to_show].copy()
+details_show = _ensure_date_for_table(details_show, date_cols)
 
-# Asegura dtype datetime para DateColumn
-for col in date_cols:
-    if not pd.api.types.is_datetime64_any_dtype(details_show[col]):
-        details_show[col] = pd.to_datetime(details_show[col], errors="coerce")
-
+sort_by = ["Product Name"] + date_cols
 st.dataframe(
-    details_show.sort_values(["Product Name"] + date_cols),
+    details_show.sort_values(sort_by),
     use_container_width=True,
     hide_index=True,
     column_config={
