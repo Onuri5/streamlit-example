@@ -65,8 +65,10 @@ if st.sidebar.checkbox("Mostrar datos filtrados"):
     # Fuerza formato YYYY-MM-DD para evitar el texto "115 years"
     df_to_show = filtered_df.copy()
     for col in ["Order Date", "Ship Date"]:
-        if col in df_to_show.columns:
-            df_to_show[col] = df_to_show[col].dt.strftime("%Y-%m-%d")
+    if col in df_to_show.columns:
+        df_to_show[col] = df_to_show[col].apply(
+            lambda x: x.strftime("%Y-%m-%d") if pd.notnull(x) else ""
+        )
     st.dataframe(
         df_to_show,
         use_container_width=True,
@@ -135,6 +137,8 @@ details_to_show = details[cols_to_show].copy()
 
 # Formato visual de fechas en la tabla de detalle
 for col in date_cols:
-    details_to_show[col] = details_to_show[col].dt.strftime("%Y-%m-%d")
+    details_to_show[col] = details_to_show[col].apply(
+        lambda x: x.strftime("%Y-%m-%d") if pd.notnull(x) else ""
+    )
 
 st.dataframe(details_to_show.sort_values(["Product Name"] + date_cols), use_container_width=True)
