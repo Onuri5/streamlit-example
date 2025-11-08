@@ -13,10 +13,10 @@ FILE_PATH = "Orders Final Limpio.xlsx"
 @st.cache_data
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_excel(path)
-    df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
-    df['Ship Date'] = pd.to_datetime(df['Ship Date'], errors='coerce')
     # Normaliza encabezados
     df.columns = df.columns.str.strip()
+    df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
+    df['Ship Date'] = pd.to_datetime(df['Ship Date'], errors='coerce')
 
     # Si existen ambas variantes, nos quedamos con "Ship Date"
     if "Ship Date" in df.columns and "Ship date" in df.columns:
