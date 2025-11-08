@@ -23,7 +23,7 @@ st.subheader('Data Types')
 st.write(df.info())
 
 # Add a region filter
-st.sidebar.subheader("Filtro por Región")
+st.sidebar.subheader("Filtro por Región y Estado")
 region_list = df['Region'].unique().tolist()
 region_list.sort()
 region_list.insert(0, 'Todas') # Add "Todas" option
@@ -31,21 +31,29 @@ selected_region = st.sidebar.selectbox('Selecciona una Región', region_list)
 
 # Filter data by selected region
 if selected_region != 'Todas':
-    filtered_df = df[df['Region'] == selected_region].copy()
+    filtered_df_region = df[df['Region'] == selected_region].copy()
 else:
-    filtered_df = df.copy()
+    filtered_df_region = df.copy()
 
 # Add a state filter based on the selected region
-state_list = filtered_df['State'].unique().tolist()
+state_list = filtered_df_region['State'].unique().tolist()
 state_list.sort()
 state_list.insert(0, 'Todos') # Add "Todos" option
 selected_state = st.sidebar.selectbox('Selecciona un Estado', state_list)
 
 # Filter data by selected state
 if selected_state != 'Todos':
-    filtered_df = filtered_df[filtered_df['State'] == selected_state].copy()
+    filtered_df = filtered_df_region[filtered_df_region['State'] == selected_state].copy()
 else:
-    filtered_df = filtered_df.copy()
+    filtered_df = filtered_df_region.copy()
+
+# Add a checkbox to show/hide the filtered data
+show_data = st.sidebar.checkbox('Mostrar datos filtrados')
+
+#Display the filtered data if the checkbox is checked
+if show_data:
+    st.subheader('Datos Filtrados')
+    st.write(filtered_df)
 
 # Calculate total sales per product for the filtered data
 product_sales = filtered_df.groupby('Product Name')['Sales'].sum().reset_index()
