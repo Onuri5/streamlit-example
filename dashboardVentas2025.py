@@ -43,9 +43,9 @@ selected_state = st.sidebar.selectbox('Selecciona un Estado', state_list)
 
 # Filter data by selected state
 if selected_state != 'Todos':
-    filtered_df = filtered_df_region[filtered_df_region['State'] == selected_state].copy()
+    filtered_df = filtered_df[filtered_df['State'] == selected_state].copy()
 else:
-    filtered_df = filtered_df_region.copy()
+    filtered_df = filtered_df.copy()
 
 # Calculate total sales per product for the filtered data
 product_sales = filtered_df.groupby('Product Name')['Sales'].sum().reset_index()
