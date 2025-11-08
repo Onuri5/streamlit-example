@@ -54,7 +54,6 @@ if df_orders[col_fecha].isna().all():
 with st.sidebar:
     st.header("Filtros")
 
-    # Rango real disponible en datos
     min_date = df_orders[col_fecha].min().date()
     max_date = df_orders[col_fecha].max().date()
 
@@ -84,7 +83,6 @@ with st.sidebar:
         start_date, end_date = end_date, start_date
         st.warning("La fecha de inicio era mayor que la de fin. Se invirtieron para continuar.")
 
-    # Filtros opcionales
     region = None
     estado = None
     if "Region" in df_orders.columns:
