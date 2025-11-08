@@ -14,11 +14,17 @@ file_path = "Orders Final Limpio.xlsx"
 @st.cache_data
 def load_data(path):
     df = pd.read_excel(path)
-    if 'Ship date' in df.columns:
-        df = df.drop('Ship date', axis=1)
+    st.write("Columnas detectadas en el archivo:", df.columns.tolist())  # <-- Verifica nombres reales
+
+    # Normalizar nombres de columnas
+    df.columns = df.columns.str.strip()  # Quita espacios en blanco
+    df.columns = df.columns.str.title()  # Pone inicial mayúscula (Order Date, Ship Date, etc.)
+
+    # Convertir fechas si existen
     for col in ['Order Date', 'Ship Date']:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
+            df[col] = pd.to_datetime(df[col], format='mixed', errors='coerce')
+
     return df
 
 df = load_data(file_path)
