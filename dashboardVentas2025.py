@@ -19,6 +19,21 @@ file_path = "Orders Limpio Final.xlsx"
 def load_data(path):
     df = pd.read_excel(path)
 
+    st.write("Vista previa del archivo original:")
+st.dataframe(df.head(10))
+
+st.write("Tipos de datos detectados:")
+st.write(df.dtypes)
+
+if "Order Date" in df.columns:
+    st.write("Ejemplo de valores en Order Date:")
+    st.write(df["Order Date"].head(10).tolist())
+
+if "Ship Date" in df.columns:
+    st.write("Ejemplo de valores en Ship Date:")
+    st.write(df["Ship Date"].head(10).tolist())
+
+
     # Mostrar columnas detectadas
     st.write("Columnas detectadas:", df.columns.tolist())
 
