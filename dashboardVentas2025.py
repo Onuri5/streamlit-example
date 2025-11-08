@@ -11,73 +11,23 @@ st.set_page_config(page_title="Análisis de Ventas y Ganancias", layout="wide")
 st.title("Análisis de Ventas y Ganancias de Productos")
 
 # -------------------------
-# Carga y limpieza de datos
+# Carga de datos
 # -------------------------
-file_path = "Orders Limpio Final.xlsx"
+file_path = "Orders Final Limpio2.xlsx"
 
-@st.cache_data
-def load_data(path):
-    df = pd.read_excel(path)
+try:
+    df_orders = pd.read_excel(file_path)
+except FileNotFoundError:
+    st.error(f"No se encontró el archivo '{file_path}'. Asegúrate de que esté en el mismo directorio del script.")
+    st.stop()
 
-    st.write("Vista previa del archivo original:")
-st.dataframe(df.head(10))
+# 1) Eliminar duplicados exactos
+df_orders = df_orders.drop_duplicates().reset_index(drop=True)
 
-st.write("Tipos de datos detectados:")
-st.write(df.dtypes)
-
-if "Order Date" in df.columns:
-    st.write("Ejemplo de valores en Order Date:")
-    st.write(df["Order Date"].head(10).tolist())
-
-if "Ship Date" in df.columns:
-    st.write("Ejemplo de valores en Ship Date:")
-    st.write(df["Ship Date"].head(10).tolist())
-
-
-    # Mostrar columnas detectadas
-    st.write("Columnas detectadas:", df.columns.tolist())
-
-    # Normalizar nombres de columnas (quita espacios y pone mayúscula inicial)
-    df.columns = df.columns.str.strip().str.title()
-
-    # Verificar si existen las columnas clave
-    if "Order Date" not in df.columns:
-        st.error("❌ No se encontró la columna 'Order Date' en el archivo.")
-        st.stop()
-
-    # Unificar columnas de Ship Date si existen variantes
-    if "Ship Date" in df.columns and "Ship Date" in df.columns:
-        sd_main = pd.to_datetime(df["Ship Date"], errors="coerce")
-        df["Ship Date"] = sd_main
-    elif "Ship Date" not in df.columns and "Ship date" in df.columns:
-        df["Ship Date"] = pd.to_datetime(df["Ship date"], errors="coerce")
-        df = df.drop(columns=["Ship date"])
-
-    # Convertir fechas de Order Date
-    col_fecha = "Order Date"
-    if pd.api.types.is_datetime64_any_dtype(df[col_fecha]):
-        pass
-    elif pd.api.types.is_numeric_dtype(df[col_fecha]):
-        origin_date = pd.Timestamp("1899-12-30")
-        df[col_fecha] = pd.to_timedelta(df[col_fecha], unit="D") + origin_date
-    elif pd.api.types.is_timedelta64_dtype(df[col_fecha]):
-        origin_date = pd.Timestamp("1899-12-30")
-        df[col_fecha] = origin_date + df[col_fecha]
-    else:
-        df[col_fecha] = pd.to_datetime(df[col_fecha], format='mixed', errors='coerce')
-
-    # Verificar si las fechas se convirtieron correctamente
-    if df[col_fecha].isna().all():
-        st.error("❌ No se pudieron convertir las fechas de 'Order Date'. Revisa el formato en el archivo Excel.")
-        st.stop()
-
-    # Verificación visual
-    st.write("Vista previa de fechas convertidas:")
-    st.dataframe(df[["Order Date", "Ship Date"]].head(10))
-
-    return df
-
-df_orders = load_data(file_path)
+# 2) Corregir descuentos expresados como enteros (17 -> 0.17)
+if "Discount" in df_orders.columns:
+    mask_pct = (df_orders["Discount"] > 1) & (df_orders["Discount"] <= 100)
+    df_orders.loc[mask_pct, "Discount"] = df_orders.loc[mask_pct, "Discount"] / 100.0
 
 # -------------------------
 # Filtros laterales
@@ -85,31 +35,38 @@ df_orders = load_data(file_path)
 with st.sidebar:
     st.header("Filtros")
 
-    # Fechas mínimas y máximas
-    min_date = df_orders["Order Date"].min().date()
-    max_date = df_orders["Order Date"].max().date()
+    # Fechas: se asume que Ship Date ya está en datetime
+    if "Ship Date" in df_orders.columns:
+        min_date = df_orders["Ship Date"].min().date()
+        max_date = df_orders["Ship Date"].max().date()
 
-    # Filtro por rango de fechas
-    rango = st.date_input(
-        "Rango de fechas",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date,
-        format="YYYY/MM/DD",
-        help="Selecciona un rango dentro de las fechas disponibles en los datos.",
-    )
+        rango = st.date_input(
+            "Rango de envío",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            format="YYYY/MM/DD",
+        )
 
-    # Validar rango seleccionado
-    if isinstance(rango, tuple) and len(rango) == 2:
-        start_date, end_date = rango
+        if isinstance(rango, tuple) and len(rango) == 2:
+            start_date, end_date = rango
+        else:
+            start_date, end_date = min_date, max_date
+
+        clipped = False
+        if start_date < min_date:
+            start_date = min_date; clipped = True
+        if end_date > max_date:
+            end_date = max_date; clipped = True
+        if clipped:
+            st.info("Las fechas seleccionadas se ajustaron automáticamente al rango disponible en los datos.")
+
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+            st.warning("La fecha de inicio era mayor que la de fin. Se invirtieron para continuar.")
     else:
-        start_date, end_date = min_date, max_date
+        start_date = end_date = None
 
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
-        st.warning("⚠️ Se invirtió el rango de fechas (inicio > fin).")
-
-    # Filtros por región y estado
     region = None
     estado = None
     if "Region" in df_orders.columns:
@@ -120,99 +77,103 @@ with st.sidebar:
     mostrar_tabla = st.checkbox("Mostrar datos filtrados", value=True)
 
 # -------------------------
-# Aplicar filtros
+# Aplicación de filtros
 # -------------------------
-mask = (df_orders["Order Date"] >= pd.Timestamp(start_date)) & (df_orders["Order Date"] <= pd.Timestamp(end_date))
-if region and region != "Todas":
-    mask &= (df_orders["Region"] == region)
-if estado and estado != "Todas":
-    mask &= (df_orders["State"] == estado)
+df_filtered = df_orders.copy()
 
-df_filtered = df_orders.loc[mask].copy()
+if "Ship Date" in df_filtered.columns and start_date and end_date:
+    mask = (df_filtered["Ship Date"] >= pd.Timestamp(start_date)) & (df_filtered["Ship Date"] <= pd.Timestamp(end_date))
+    df_filtered = df_filtered.loc[mask]
+
+if region and region != "Todas":
+    df_filtered = df_filtered.loc[df_filtered["Region"] == region]
+
+if estado and estado != "Todas":
+    df_filtered = df_filtered.loc[df_filtered["State"] == estado]
 
 if df_filtered.empty:
-    st.warning("⚠️ No hay datos disponibles para el rango o filtros seleccionados.")
+    st.warning("No hay datos para los filtros seleccionados.")
     st.stop()
 
-st.success("✅ Datos cargados y filtrados correctamente.")
+st.success("Datos cargados y filtrados correctamente.")
 
 # -------------------------
-# Mostrar datos filtrados
+# Función para envolver texto
+# -------------------------
+def wrap_text(txt: str, width: int = 22) -> str:
+    return "<br>".join(textwrap.wrap(str(txt), width=width))
+
+# -------------------------
+# Tabla de datos filtrados
 # -------------------------
 st.subheader("Datos filtrados")
-
 if mostrar_tabla:
     cols_pref = [
-        "Order Date", "Ship Date", "Discount", "Sales", "Quantity", "Profit",
-        "Region", "State", "Order Id", "Product Name", "City"
+        "Ship Date","Discount","Sales","Quantity","Profit",
+        "Region","State","Order ID","Product Name","City"
     ]
     cols_show = [c for c in cols_pref if c in df_filtered.columns]
     if not cols_show:
         cols_show = df_filtered.columns.tolist()
 
     st.dataframe(
-        df_filtered[cols_show].sort_values("Order Date"),
+        df_filtered[cols_show].sort_values(cols_show[0]),
         use_container_width=True,
         hide_index=True,
     )
 
 # -------------------------
-# Función para ajustar etiquetas largas
+# Agregaciones y gráficas
 # -------------------------
-def wrap_text(txt: str, width: int = 22) -> str:
-    return "<br>".join(textwrap.wrap(str(txt), width=width))
+if "Product Name" in df_filtered.columns:
+    ventas_por_producto = df_filtered.groupby("Product Name")["Sales"].sum()
+    ganancias_por_producto = df_filtered.groupby("Product Name")["Profit"].sum()
 
-# -------------------------
-# Gráficos: Top 5 Ventas y Ganancias
-# -------------------------
-ventas_por_producto = df_filtered.groupby("Product Name")["Sales"].sum()
-ganancias_por_producto = df_filtered.groupby("Product Name")["Profit"].sum()
+    # Top 5 por Ventas
+    top_5_v = ventas_por_producto.sort_values(ascending=False).head(5)
+    fig_ventas = px.bar(
+        x=top_5_v.index,
+        y=top_5_v.values,
+        labels={"x": "Producto", "y": "Ventas Totales"},
+        title="Top 5 Productos Más Vendidos",
+    )
+    fig_ventas.update_layout(xaxis_tickangle=0, margin=dict(b=160))
+    fig_ventas.update_xaxes(
+        tickmode="array",
+        tickvals=list(top_5_v.index),
+        ticktext=[wrap_text(n) for n in top_5_v.index],
+    )
+    st.header("Top 5 Productos Más Vendidos")
+    st.plotly_chart(fig_ventas, use_container_width=True)
 
-# Top 5 por ventas
-top_5_v = ventas_por_producto.sort_values(ascending=False).head(5)
-fig_ventas = px.bar(
-    x=top_5_v.index,
-    y=top_5_v.values,
-    labels={"x": "Producto", "y": "Ventas Totales"},
-    title="Top 5 Productos Más Vendidos"
-)
-fig_ventas.update_layout(xaxis_tickangle=0, margin=dict(b=160))
-fig_ventas.update_xaxes(
-    tickmode="array",
-    tickvals=list(top_5_v.index),
-    ticktext=[wrap_text(n) for n in top_5_v.index],
-)
-st.header("Top 5 Productos Más Vendidos")
-st.plotly_chart(fig_ventas, use_container_width=True)
+    # Top 5 por Ganancia
+    top_5_g = ganancias_por_producto.sort_values(ascending=False).head(5)
+    fig_ganancias = px.bar(
+        x=top_5_g.index,
+        y=top_5_g.values,
+        labels={"x": "Producto", "y": "Ganancias Totales"},
+        title="Top 5 Productos con Mayor Ganancia",
+    )
+    fig_ganancias.update_layout(xaxis_tickangle=0, margin=dict(b=160))
+    fig_ganancias.update_xaxes(
+        tickmode="array",
+        tickvals=list(top_5_g.index),
+        ticktext=[wrap_text(n) for n in top_5_g.index],
+    )
+    st.header("Top 5 Productos con Mayor Ganancia")
+    st.plotly_chart(fig_ganancias, use_container_width=True)
 
-# Top 5 por ganancia
-top_5_g = ganancias_por_producto.sort_values(ascending=False).head(5)
-fig_ganancias = px.bar(
-    x=top_5_g.index,
-    y=top_5_g.values,
-    labels={"x": "Producto", "y": "Ganancias Totales"},
-    title="Top 5 Productos con Mayor Ganancia"
-)
-fig_ganancias.update_layout(xaxis_tickangle=0, margin=dict(b=160))
-fig_ganancias.update_xaxes(
-    tickmode="array",
-    tickvals=list(top_5_g.index),
-    ticktext=[wrap_text(n) for n in top_5_g.index],
-)
-st.header("Top 5 Productos con Mayor Ganancia")
-st.plotly_chart(fig_ganancias, use_container_width=True)
-
-# -------------------------
-# Dispersión Ventas vs Ganancias
-# -------------------------
-df_summary = pd.concat([ventas_por_producto, ganancias_por_producto], axis=1)
-df_summary.columns = ["Ventas Totales", "Ganancias Totales"]
-fig_scatter = px.scatter(
-    df_summary,
-    x="Ventas Totales",
-    y="Ganancias Totales",
-    hover_name=df_summary.index,
-    title="Relación entre Ventas y Ganancias por Producto",
-)
-st.header("Relación entre Ventas y Ganancias por Producto")
-st.plotly_chart(fig_scatter, use_container_width=True)
+    # Dispersión Ventas vs Ganancias
+    df_summary = pd.concat([ventas_por_producto, ganancias_por_producto], axis=1)
+    df_summary.columns = ["Ventas Totales", "Ganancias Totales"]
+    fig_scatter = px.scatter(
+        df_summary,
+        x="Ventas Totales",
+        y="Ganancias Totales",
+        hover_name=df_summary.index,
+        title="Relación entre Ventas y Ganancias por Producto",
+    )
+    st.header("Relación entre Ventas y Ganancias por Producto")
+    st.plotly_chart(fig_scatter, use_container_width=True)
+else:
+    st.warning("No se encontró la columna 'Product Name' para generar las gráficas.")
