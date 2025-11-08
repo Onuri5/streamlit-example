@@ -14,6 +14,9 @@ file_path = "Orders Final Limpio.xlsx"
 @st.cache_data
 def load_data(path):
     data = pd.read_excel(path)
+    df = df.drop('Ship date', axis=1)
+    df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
+    df['Ship Date'] = pd.to_datetime(df['Ship Date'], errors='coerce')
     return data
 
 df = load_data(file_path)
