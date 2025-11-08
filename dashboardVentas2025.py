@@ -4,87 +4,114 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Set the title of the Streamlit app
-st.title('Product Sales and Profit Analysis')
+st.set_page_config(page_title="Product Sales and Profit Analysis", layout="wide")
+st.title("Product Sales and Profit Analysis")
 
-# File path (assuming the file is accessible by the Streamlit app)
-file_path = "Orders Final Limpio.xlsx"
+FILE_PATH = "Orders Final Limpio.xlsx"
 
-# Read the data
 @st.cache_data
-def load_data(path):
+def load_data(path: str) -> pd.DataFrame:
     df = pd.read_excel(path)
-    if 'Ship date' in df.columns:
-        df = df.drop('Ship date', axis=1)
-    for col in ['Order Date', 'Ship Date']:
+
+    # Normaliza encabezados (espacios/casos)
+    df.columns = df.columns.str.strip()
+
+    # Unifica nombres típicos de fechas
+    rename_map = {}
+    for c in df.columns:
+        lc = c.lower().strip()
+        if lc == "order date":
+            rename_map[c] = "Order Date"
+        if lc in ("ship date", "shipdate", "ship date "):
+            rename_map[c] = "Ship Date"
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    # Convierte fechas
+    for col in ["Order Date", "Ship Date"]:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    # Convierte numéricos
+    for col in ["Sales", "Profit", "Quantity"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
     return df
 
-df = load_data(file_path)
+df = load_data(FILE_PATH)
 
-# Display data types
-st.subheader('Data Types')
-st.write(df.info())
-
-# Add a region filter
+# ---------------- Sidebar filtros ----------------
 st.sidebar.subheader("Filtro por Región y Estado")
-region_list = df['Region'].unique().tolist()
-region_list.sort()
-region_list.insert(0, 'Todas') # Add "Todas" option
-selected_region = st.sidebar.selectbox('Selecciona una Región', region_list)
+region_list = ["Todas"] + sorted(df["Region"].dropna().unique().tolist())
+selected_region = st.sidebar.selectbox("Selecciona una Región", region_list)
 
-# Filter data by selected region
-if selected_region != 'Todas':
-    filtered_df_region = df[df['Region'] == selected_region].copy()
-else:
-    filtered_df_region = df.copy()
+df_region = df if selected_region == "Todas" else df[df["Region"] == selected_region].copy()
 
-# Add a state filter based on the selected region
-state_list = filtered_df_region['State'].unique().tolist()
-state_list.sort()
-state_list.insert(0, 'Todos') # Add "Todos" option
-selected_state = st.sidebar.selectbox('Selecciona un Estado', state_list)
+state_list = ["Todos"] + sorted(df_region["State"].dropna().unique().tolist())
+selected_state = st.sidebar.selectbox("Selecciona un Estado", state_list)
 
-# Filter data by selected state
-if selected_state != 'Todos':
-    filtered_df = filtered_df_region[filtered_df_region['State'] == selected_state].copy()
-else:
-    filtered_df = filtered_df_region.copy()
+filtered_df = df_region if selected_state == "Todos" else df_region[df_region["State"] == selected_state].copy()
 
-# Add a checkbox to show/hide the filtered data
-show_data = st.sidebar.checkbox('Mostrar datos filtrados')
+if st.sidebar.checkbox("Mostrar datos filtrados"):
+    st.subheader("Datos Filtrados")
+    st.dataframe(filtered_df, use_container_width=True)
 
-#Display the filtered data if the checkbox is checked
-if show_data:
-    st.subheader('Datos Filtrados')
-    st.write(filtered_df)
+# ---------------- Tipos de datos (arregla el 'None') ----------------
+st.subheader("Data Types")
+st.dataframe(
+    pd.DataFrame({"Column": df.columns, "Dtype": df.dtypes.astype(str)}),
+    use_container_width=True,
+)
 
-# Calculate total sales per product for the filtered data
-product_sales = filtered_df.groupby('Product Name')['Sales'].sum().reset_index()
+# ---------------- Agregaciones ----------------
+product_sales = (
+    filtered_df.groupby("Product Name", as_index=False)["Sales"]
+    .sum()
+    .sort_values("Sales", ascending=False)
+    .head(5)
+)
+product_profit = (
+    filtered_df.groupby("Product Name", as_index=False)["Profit"]
+    .sum()
+    .sort_values("Profit", ascending=False)
+    .head(5)
+)
 
-# Get the top 5 best-selling products for the filtered data
-top_5_products = product_sales.nlargest(5, 'Sales')
+lugar = selected_state if selected_state != "Todos" else selected_region
 
-# Create a bar chart for top 5 best-selling products using Plotly Express
-st.subheader(f'Top 5 Productos Más Vendidos en {selected_state if selected_state != "Todos" else selected_region}')
-fig_sales = px.bar(top_5_products, x='Sales', y='Product Name', title=f'Top 5 Productos Más Vendidos en {selected_state if selected_state != "Todos" else selected_region}')
-fig_sales.update_layout(yaxis={'categoryorder':'total ascending', 'tickangle': -45, 'tickfont': dict(size=10)}, margin=dict(l=150, r=20, t=40, b=30))
-st.plotly_chart(fig_sales)
+# ---------------- Gráficas (sin etiquetas diagonales) ----------------
+st.subheader(f"Top 5 Productos Más Vendidos en {lugar}")
+fig_sales = px.bar(
+    product_sales.sort_values("Sales", ascending=True),
+    x="Sales",
+    y="Product Name",
+    orientation="h",
+    labels={"Sales": "Ventas", "Product Name": "Producto"},
+    title=f"Top 5 Productos Más Vendidos en {lugar}",
+)
+fig_sales.update_yaxes(automargin=True)
+fig_sales.update_layout(margin=dict(l=280, r=20, t=40, b=40))
+st.plotly_chart(fig_sales, use_container_width=True)
 
-# Calculate total profit per product for the filtered data
-product_profit = filtered_df.groupby('Product Name')['Profit'].sum().reset_index()
+st.subheader(f"Top 5 Productos por Ganancia en {lugar}")
+fig_profit = px.bar(
+    product_profit.sort_values("Profit", ascending=True),
+    x="Profit",
+    y="Product Name",
+    orientation="h",
+    labels={"Profit": "Ganancia", "Product Name": "Producto"},
+    title=f"Top 5 Productos por Ganancia en {lugar}",
+)
+fig_profit.update_yaxes(automargin=True)
+fig_profit.update_layout(margin=dict(l=280, r=20, t=40, b=40))
+st.plotly_chart(fig_profit, use_container_width=True)
 
-# Get the top 5 products by profit for the filtered data
-top_5_profit_products = product_profit.nlargest(5, 'Profit')
+# ---------------- Detalle (ahora incluye fechas) ----------------
+st.subheader(f"Detalles de los 5 Productos Más Vendidos en {lugar}")
+date_cols = [c for c in ["Order Date", "Ship Date"] if c in filtered_df.columns]
+base_cols = ["Product Name", "Sales", "Profit", "Quantity", "Region", "State"]
+cols_to_show = ["Product Name"] + date_cols + base_cols[1:]
 
-# Create a bar chart for top 5 products by profit using Plotly Express
-st.subheader(f'Top 5 Productos por Ganancia en {selected_state if selected_state != "Todos" else selected_region}')
-fig_profit = px.bar(top_5_profit_products, x='Profit', y='Product Name', title=f'Top 5 Productos por Ganancia en {selected_state if selected_state != "Todos" else selected_region}')
-fig_profit.update_layout(yaxis={'categoryorder':'total ascending', 'tickangle': -45, 'tickfont': dict(size=10)}, margin=dict(l=150, r=20, t=40, b=30))
-st.plotly_chart(fig_profit)
-
-# Display sales and profit details for the top 5 products in the filtered data
-st.subheader(f'Detalles de los 5 Productos Más Vendidos en {selected_state if selected_state != "Todos" else selected_region}')
-top_5_products_details = filtered_df[filtered_df['Product Name'].isin(top_5_products['Product Name'])].copy()
-st.write(top_5_products_details[['Product Name', 'Sales', 'Profit', 'Quantity', 'Region', 'State']])
+details = filtered_df[filtered_df["Product Name"].isin(product_sales["Product Name"])]
+st.dataframe(details[cols_to_show].sort_values(["Product Name", *date_cols]), use_container_width=True)
