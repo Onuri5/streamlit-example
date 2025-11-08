@@ -36,7 +36,7 @@ else:
     filtered_df = df.copy()
 
 # Add a state filter based on the selected region
-state_list = filtered_df_region['State'].unique().tolist()
+state_list = filtered_df['State'].unique().tolist()
 state_list.sort()
 state_list.insert(0, 'Todos') # Add "Todos" option
 selected_state = st.sidebar.selectbox('Selecciona un Estado', state_list)
