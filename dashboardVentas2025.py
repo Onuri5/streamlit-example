@@ -35,11 +35,14 @@ def load_data(path: str) -> pd.DataFrame:
     # Convierte fechas (acepta serial de Excel o texto)
     for col in ["Order Date", "Ship Date"]:
         if col in df.columns:
+            print(f"Before conversion - Column: {col}, Dtype: {df[col].dtype}, Sample values: {df[col].head().tolist()}") # Debug print
             if pd.api.types.is_numeric_dtype(df[col]):
                 # serial de Excel -> fecha
                 df[col] = pd.to_datetime(df[col], unit="d", origin="1899-12-30", errors="coerce")
             else:
                 df[col] = pd.to_datetime(df[col], errors="coerce")
+            print(f"After conversion - Column: {col}, Dtype: {df[col].dtype}, Sample values: {df[col].head().tolist()}") # Debug print
+
 
     # Convierte numéricos frecuentes
     for col in ["Sales", "Profit", "Quantity", "Discount"]:
