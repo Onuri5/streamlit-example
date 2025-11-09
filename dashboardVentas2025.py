@@ -18,6 +18,22 @@ if "Discount" in df_orders.columns:
     mask_pct = (df_orders["Discount"] > 1) & (df_orders["Discount"] <= 100)
     df_orders.loc[mask_pct, "Discount"] = df_orders.loc[mask_pct, "Discount"] / 100.0
 
+col_fecha = "Order Date"
+if pd.api.types.is_datetime64_any_dtype(df_orders[col_fecha]):
+    pass
+elif pd.api.types.is_numeric_dtype(df_orders[col_fecha]):
+    origin_date = pd.Timestamp("1899-12-30")
+    df_orders[col_fecha] = pd.to_timedelta(df_orders[col_fecha], unit="D") + origin_date
+elif pd.api.types.is_timedelta64_dtype(df_orders[col_fecha]):
+    origin_date = pd.Timestamp("1899-12-30")
+    df_orders[col_fecha] = origin_date + df_orders[col_fecha]
+else:
+    df_orders[col_fecha] = pd.to_datetime(df_orders[col_fecha], errors="coerce")
+
+if df_orders[col_fecha].isna().all():
+    st.error("No se pudo convertir correctamente la columna 'Order Date' a fecha.")
+    st.stop()
+
 # Filtros
 
 with st.sidebar:
