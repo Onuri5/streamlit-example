@@ -4,15 +4,9 @@ import plotly.express as px
 import textwrap
 import numpy as np
 
-# -------------------------
-# Configuración de página
-# -------------------------
 st.set_page_config(page_title="Análisis de Ventas y Ganancias", layout="wide")
 st.title("Análisis de Ventas y Ganancias de Productos")
 
-# -------------------------
-# Carga y limpieza de datos
-# -------------------------
 file_path = "Orders Final Limpio2.xlsx"
 df_orders = pd.read_excel(file_path)
 
@@ -24,33 +18,8 @@ if "Discount" in df_orders.columns:
     mask_pct = (df_orders["Discount"] > 1) & (df_orders["Discount"] <= 100)
     df_orders.loc[mask_pct, "Discount"] = df_orders.loc[mask_pct, "Discount"] / 100.0
 
-# 3) Unificar Ship Date y remover columna duplicada si existe
-if "Ship Date" in df_orders.columns and "Ship date" in df_orders.columns:
-    sd_main = pd.to_datetime(df_orders["Ship Date"], errors="coerce")
-    sd_alt  = pd.to_datetime(df_orders["Ship date"], errors="coerce")
-    df_orders["Ship Date"] = sd_main.fillna(sd_alt)
-    df_orders = df_orders.drop(columns=["Ship date"])
+# Filtros
 
-# 4) Normalizar columna de fecha (Order Date)
-col_fecha = "Order Date"
-if pd.api.types.is_datetime64_any_dtype(df_orders[col_fecha]):
-    pass
-elif pd.api.types.is_numeric_dtype(df_orders[col_fecha]):
-    origin_date = pd.Timestamp("1899-12-30")
-    df_orders[col_fecha] = pd.to_timedelta(df_orders[col_fecha], unit="D") + origin_date
-elif pd.api.types.is_timedelta64_dtype(df_orders[col_fecha]):
-    origin_date = pd.Timestamp("1899-12-30")
-    df_orders[col_fecha] = origin_date + df_orders[col_fecha]
-else:
-    df_orders[col_fecha] = pd.to_datetime(df_orders[col_fecha], errors="coerce")
-
-if df_orders[col_fecha].isna().all():
-    st.error("No se pudo convertir correctamente la columna 'Order Date' a fecha.")
-    st.stop()
-
-# -------------------------
-# Filtros laterales
-# -------------------------
 with st.sidebar:
     st.header("Filtros")
 
@@ -110,15 +79,11 @@ if df_filtered.empty:
 
 st.success("Datos cargados y filtrados correctamente.")
 
-# -------------------------
 # Utilidad: envolver etiquetas largas
-# -------------------------
 def wrap_text(txt: str, width: int = 22) -> str:
     return "<br>".join(textwrap.wrap(str(txt), width=width))
 
-# -------------------------
 # Tabla de datos filtrados
-# -------------------------
 st.subheader("Datos filtrados")
 if mostrar_tabla:
     cols_pref = [
@@ -135,9 +100,7 @@ if mostrar_tabla:
         hide_index=True,
     )
 
-# -------------------------
 # Agregaciones para gráficas
-# -------------------------
 ventas_por_producto = df_filtered.groupby("Product Name")["Sales"].sum()
 ganancias_por_producto = df_filtered.groupby("Product Name")["Profit"].sum()
 
@@ -187,4 +150,3 @@ fig_scatter = px.scatter(
 )
 st.header("Relación entre Ventas y Ganancias por Producto")
 st.plotly_chart(fig_scatter, use_container_width=True)
-
